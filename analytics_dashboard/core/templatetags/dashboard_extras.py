@@ -103,6 +103,11 @@ def show_metrics_error():
     return _get_base_error_context('metrics')
 
 
+@register.inclusion_tag('section_error.html')
+def show_report_error():
+    return _get_base_error_context('report')
+
+
 def _get_base_error_context(content_type, background_class=''):
     return {
         'content_type': content_type,

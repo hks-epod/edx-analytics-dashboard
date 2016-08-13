@@ -1,11 +1,16 @@
 import logging
 
 from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 from slugify import slugify
 
-from courses.presenters.performance import CoursePerformancePresenter
+from waffle import switch_is_active
+
+from analyticsclient.exceptions import NotFoundError
+
+from courses.presenters.performance import CoursePerformancePresenter, CourseReportDownloadPresenter
 from courses.views import (
     CourseTemplateWithNavView,
     CourseAPIMixin,
@@ -30,7 +35,9 @@ class PerformanceTemplateView(CourseStructureExceptionMixin, CourseTemplateWithN
 
     secondary_nav_items = [
         {'name': 'graded_content', 'label': _('Graded Content'), 'view': 'courses:performance:graded_content'},
-        {'name': 'ungraded_content', 'label': _('Ungraded Problems'), 'view': 'courses:performance:ungraded_content'}
+        {'name': 'ungraded_content', 'label': _('Ungraded Problems'), 'view': 'courses:performance:ungraded_content'},
+        {'name': 'problem_responses', 'label': _('Problem Responses'), 'view': 'courses:performance:problem_responses',
+         'switch': 'enable_problem_response_download'},
     ]
 
     active_primary_nav_item = 'performance'
@@ -285,3 +292,50 @@ class PerformanceUngradedAnswerDistribution(PerformanceAnswerDistributionMixin,
     template_name = 'courses/performance_ungraded_answer_distribution.html'
     page_name = 'performance_ungraded_answer_distribution'
     page_title = _('Performance: Problem Submissions')
+
+
+class ProblemResponseDownloadView(PerformanceTemplateView):
+    """
+    View that allows users to download a CSV that contains every learner's answer to every
+    problem in the course.
+
+    The CSV is served from an external file server, such as S3. This view is responsible
+    for presenting the UI that explains it to users and generates a temporary download URL
+    using the data API.
+
+    This view is only available if the enable_problem_response_download switch is enabled.
+    """
+    template_name = 'courses/performance_problem_responses.html'
+    active_secondary_nav_item = 'problem_responses'
+    page_name = 'performance_problem_responses'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not switch_is_active('enable_problem_response_download'):
+            raise Http404
+        return super(ProblemResponseDownloadView, self).dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super(ProblemResponseDownloadView, self).get_context_data(**kwargs)
+
+        try:
+            info = CourseReportDownloadPresenter(self.course_id).get_report_info(
+                report_name=CourseReportDownloadPresenter.PROBLEM_RESPONSES
+            )
+        except NotFoundError:
+            info = {}
+
+        redirect_url = reverse('courses:csv:performance_problem_responses', kwargs={'course_id': self.course_id})
+
+        context.update({
+            'report_url': redirect_url if 'download_url' in info else None,
+            'page_data': self.get_page_data(context),
+            'page_title': _('Problem Responses'),
+        })
+
+        last_updated = info.get('last_modified')
+        if last_updated:  # last_modified information may not be available
+            context['update_message'] = self.get_last_updated_message(last_updated)
+        if 'file_size' in info:
+            context['report_download_size_kb'] = info["file_size"] / 1024
+
+        return context

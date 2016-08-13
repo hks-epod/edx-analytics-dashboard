@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 
@@ -48,20 +49,20 @@ class CoursePerformanceViewTestMixin(PatchMixin, CourseStructureViewMixin, Cours
         }
         self.assertDictEqual(nav, expected)
 
-    def get_expected_secondary_nav(self, _course_id):
+    def get_expected_secondary_nav(self, course_id):
         """ Override this for each page. """
         return [
             {
-                'active': True,
+                'active': False,
                 'name': 'graded_content',
                 'label': _('Graded Content'),
-                'href': '#'
+                'href': reverse('courses:performance:graded_content', kwargs={'course_id': course_id}),
             },
             {
-                'active': True,
+                'active': False,
                 'name': 'ungraded_content',
                 'label': _('Ungraded Problems'),
-                'href': '#'
+                'href': reverse('courses:performance:ungraded_content', kwargs={'course_id': course_id}),
             }
         ]
 
@@ -127,9 +128,9 @@ class CoursePerformanceGradedMixin(CoursePerformanceViewTestMixin):
 
     def get_expected_secondary_nav(self, course_id):
         expected = super(CoursePerformanceGradedMixin, self).get_expected_secondary_nav(course_id)
-        expected[1].update({
-            'href': reverse('courses:performance:ungraded_content', kwargs={'course_id': course_id}),
-            'active': False
+        expected[0].update({
+            'href': '#',
+            'active': True,
         })
         return expected
 
@@ -168,9 +169,9 @@ class CoursePerformanceUngradedMixin(CoursePerformanceViewTestMixin):
 
     def get_expected_secondary_nav(self, course_id):
         expected = super(CoursePerformanceUngradedMixin, self).get_expected_secondary_nav(course_id)
-        expected[0].update({
-            'href': reverse('courses:performance:graded_content', kwargs={'course_id': course_id}),
-            'active': False
+        expected[1].update({
+            'href': '#',
+            'active': True,
         })
         return expected
 
@@ -471,3 +472,72 @@ class CoursePerformanceUngradedSubsectionViewTests(CoursePerformanceUngradedMixi
         self.mock_course_detail(DEMO_COURSE_ID)
         response = self.client.get(self.path(course_id=DEMO_COURSE_ID, section_id='Invalid', subsection_id='Nope'))
         self.assertEqual(response.status_code, 404)
+
+
+@override_switch('enable_course_api', active=True)
+@override_switch('enable_problem_response_download', active=True)
+class ProblemResponseDownloadViewTests(CoursePerformanceViewTestMixin, TestCase):
+    course_id = 'course-v1:Test+ing+This'
+    viewname = 'courses:performance:problem_responses'
+    active_secondary_nav_label = 'Problem Responses'
+    presenter_method = 'courses.presenters.performance.CourseReportDownloadPresenter.get_report_info'
+    dummy_date = datetime.datetime.now()
+
+    def get_expected_secondary_nav(self, course_id):
+        expected = super(ProblemResponseDownloadViewTests, self).get_expected_secondary_nav(course_id)
+        expected.append(
+            {
+                'active': True,
+                'name': 'problem_responses',
+                'label': _('Problem Responses'),
+                'href': '#'
+            }
+        )
+        return expected
+
+    def setUp(self):
+        super(ProblemResponseDownloadViewTests, self).setUp()
+
+        def mock_get_report_info(report_name):  # pylint: disable=unused-argument
+            return {
+                "course_id": "Test_ing_This",
+                "report_name": "problem_response",
+                "download_url": "https://bucket.s3.amazonaws.com/Test_ing_This_problem_response.csv?Signature=...",
+                "last_modified": ProblemResponseDownloadViewTests.dummy_date,
+                "file_size": 2200,
+                "expiration_date": ProblemResponseDownloadViewTests.dummy_date,
+            }
+        self._patch(self.presenter_method, side_effect=mock_get_report_info)
+        self.start_patching()
+
+    def test_invalid_course(self):
+        pass  # This view doesn't call the course API so doesn't need this inherited test
+
+    def assertValidContext(self, context):
+        report_url = reverse('courses:csv:performance_problem_responses', kwargs={'course_id': DEMO_COURSE_ID})
+        self.assertDictContainsSubset(
+            {
+                'page_title': 'Problem Responses',
+                'report_url': report_url,
+                'report_download_size_kb': 2,  # 2200 bytes rounds to 2 KiB
+            },
+            context
+        )
+        self.assertIn('update_message', context)
+
+    def assertValidMissingDataContext(self, context):
+        self.assertDictContainsSubset(
+            {
+                'page_title': 'Problem Responses',
+                'report_url': None,
+            },
+            context
+        )
+
+    def test_missing_data(self):
+        self.stop_patching()
+        with patch(self.presenter_method, Mock(side_effect=NotFoundError)):
+            response = self.client.get(self.path(course_id=DEMO_COURSE_ID))
+            context = response.context
+
+        self.assertValidMissingDataContext(context)

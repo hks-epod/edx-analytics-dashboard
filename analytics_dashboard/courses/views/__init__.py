@@ -518,7 +518,7 @@ class CourseHome(CourseTemplateWithNavView):
         items.append(engagement_items)
 
         if self.course_api_enabled:
-            items.append({
+            performance_items = {
                 'name': _('Performance'),
                 'icon': 'fa-check-square-o',
                 'heading': _('How are students doing on course assignments?'),
@@ -536,7 +536,16 @@ class CourseHome(CourseTemplateWithNavView):
                         'fragment': ''
                     }
                 ]
-            })
+            }
+
+            if switch_is_active('enable_problem_response_download'):
+                performance_items['items'].append({
+                    'title': _('How are students responding to questions?'),
+                    'view': 'courses:performance:problem_responses',
+                    'breadcrumbs': [_('Problem Response Report')]
+                })
+
+            items.append(performance_items)
 
         if flag_is_active(request, 'display_learner_analytics'):
             items.append({

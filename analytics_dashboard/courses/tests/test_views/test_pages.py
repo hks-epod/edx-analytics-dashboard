@@ -59,6 +59,26 @@ class CourseHomeViewTests(CourseViewTestMixin, TestCase):
         self.assertEqual(overview_data.get('End Date'), 'February 15, 2015')
         self.assertEqual(overview_data.get('Status'), 'Ended')
 
+    @data(True, False)
+    @httpretty.activate
+    @override_switch('enable_course_api', active=True)
+    def test_performance_problem_response_link_default(self, enabled):
+        """
+        Ensure the problem resposne link is disabled by default but can be enabled by a switch
+        """
+        self.mock_course_detail(DEMO_COURSE_ID, {})
+        path = self.path(course_id=DEMO_COURSE_ID)
+        if enabled:
+            with override_switch('enable_problem_response_download', active=True):
+                response = self.client.get(path)
+        else:
+            response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['page_title'], 'Course Home')
+        performance_item = next(g for g in response.context['table_items'] if unicode(g['name']) == u'Performance')
+        performance_views = [item['view'] for item in performance_item['items']]
+        self.assertEqual('courses:performance:problem_responses' in performance_views, enabled)
+
 
 class CourseIndexViewTests(CourseAPIMixin, ViewTestMixin, CoursePermissionsExceptionMixin, TestCase):
     viewname = 'courses:index'
