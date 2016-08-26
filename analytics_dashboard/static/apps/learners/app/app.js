@@ -28,6 +28,8 @@ define(function(require) {
          *   for the HTML element that this app should attach to
          * - learnerListUrl (string) required - the URL for the
          *   Learner List API endpoint.
+         * - learnerListDownloadUrl (string) required - the CSV download URL
+         *   for the Learner List API endpoint.
          * - courseLearnerMetadataUrl (String) required - the URL for
          *   the Course Learner Metadata API endpoint.
          * - learnerListJson (Object) optional - an Object
@@ -54,6 +56,7 @@ define(function(require) {
 
             learnerCollection = new LearnerCollection(this.options.learnerListJson, {
                 url: this.options.learnerListUrl,
+                download_url: this.options.learnerListDownloadUrl,
                 courseId: this.options.courseId,
                 parse: this.options.learnerListJson
             });

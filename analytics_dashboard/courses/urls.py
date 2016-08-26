@@ -70,6 +70,8 @@ PERFORMANCE_URLS = ([
     url(r'^graded_content/assignments/{}/$'.format(ASSIGNMENT_ID_PATTERN),
         performance.PerformanceAssignment.as_view(),
         name='assignment'),
+
+    url(r'problem_responses/$', performance.ProblemResponseDownloadView.as_view(), name='problem_responses'),
 ], 'performance')
 
 CSV_URLS = ([
@@ -94,6 +96,7 @@ CSV_URLS = ([
                                                                                    PROBLEM_PART_ID_PATTERN),
         csv.PerformanceAnswerDistributionCSV.as_view(),
         name='performance_answer_distribution'),
+    url(r'problem_responses/', csv.PerformanceProblemResponseCSV.as_view(), name='performance_problem_responses')
 ], 'csv')
 
 LEARNER_URLS = ([

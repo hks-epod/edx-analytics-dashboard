@@ -1,0 +1,40 @@
+{% extends "courses/base-course.html" %}
+{% load i18n %}
+{% load dashboard_extras %}
+
+{% block child_content %}
+
+  <section class="view-section" data-section="enrollment-basics" aria-hidden="true">
+    <div class="section-heading">
+      <h4 class="section-title">{% trans "Problem Responses" %}</h4>
+      <span class="section-heading-note small">{% trans "How are students responding to questions?" %}</span>
+    </div>
+
+    <div class="section-content">
+        <p>
+        {% blocktrans %}
+            This downloadable report includes the most recent answer that each learner gave for every supported problem in the course.
+        {% endblocktrans %}
+        </p>
+
+        {% if report_url %}
+            <div class="section-action">
+                <p><a class="btn btn-default" href="{{ report_url }}" data-role="learner-data-csv" data-track-type="click"
+                   data-track-event="edx.bi.csv.downloaded" data-track-category="problem-response-report">
+                  <span class="ico fa fa-download"></span>
+                  {% trans "Download Problem Responses (CSV format)" %}
+                </a></p>
+
+                {% if report_download_size_kb %}
+                  {% blocktrans %}Download size: {{report_download_size_kb}} KiB{% endblocktrans %}
+                {% endif %}
+                <p>
+            </div>
+        {% else %}
+            {% show_report_error %}
+        {% endif %}
+
+    </div>
+  </section>
+
+{% endblock %}
